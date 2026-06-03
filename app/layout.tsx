@@ -1,10 +1,16 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
 import './globals.css'
 
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+})
+
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
+  title: 'Colomzuela | Estado Digital Binacional',
+  description: 'Estado digital fundado el 29 de abril de 2026. Sin permiso. Sin frontera. Dignidad humana intocable.',
   generator: 'v0.app',
   icons: {
     icon: [
@@ -31,8 +37,8 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
-      <body className="font-sans antialiased">
+    <html lang="es" className={`dark ${inter.variable}`}>
+      <body className="font-sans antialiased bg-background">
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
