@@ -2,9 +2,8 @@
 
 import type React from "react"
 
-import { useState, useRef, useCallback } from "react"
+import { useState, useCallback } from "react"
 import QRCode from "qrcode"
-import { toPng } from "html-to-image"
 import { Upload, Download, Star, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -41,6 +40,49 @@ function formatFecha(date: Date): string {
     month: "long",
     year: "numeric",
   })
+}
+
+/**
+ * Loads an image from a base64 dataURL and resolves only AFTER onload fires,
+ * guaranteeing the bitmap is decoded before it is drawn onto a canvas.
+ */
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.crossOrigin = "anonymous"
+    img.onload = () => resolve(img)
+    img.onerror = reject
+    img.src = src
+  })
+}
+
+/** Wraps text to a max width, returning the lines. */
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  const words = text.split(" ")
+  const lines: string[] = []
+  let line = ""
+  for (const word of words) {
+    const test = line ? `${line} ${word}` : word
+    if (ctx.measureText(test).width > maxWidth && line) {
+      lines.push(line)
+      line = word
+    } else {
+      line = test
+    }
+  }
+  if (line) lines.push(line)
+  return lines
+}
+
+/** Draws a rounded rectangle path. */
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.arcTo(x + w, y, x + w, y + h, r)
+  ctx.arcTo(x + w, y + h, x, y + h, r)
+  ctx.arcTo(x, y + h, x, y, r)
+  ctx.arcTo(x, y, x + w, y, r)
+  ctx.closePath()
 }
 
 export function CedulaGenerator() {
