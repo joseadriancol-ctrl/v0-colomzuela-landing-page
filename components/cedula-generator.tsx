@@ -83,7 +83,32 @@ export function CedulaGenerator() {
     if (!cardRef.current || !cedula) return
     setDownloading(true)
     try {
+      // Ensure every image inside the card is fully loaded and decoded
+      // before rasterizing, otherwise html-to-image captures empty images.
+      const images = Array.from(cardRef.current.querySelectorAll("img"))
+      await Promise.all(
+        images.map(async (img) => {
+          try {
+            if (!img.complete || img.naturalWidth === 0) {
+              await new Promise<void>((resolve) => {
+                img.onload = () => resolve()
+                img.onerror = () => resolve()
+              })
+            }
+            if (typeof img.decode === "function") {
+              await img.decode().catch(() => {})
+            }
+          } catch {
+            // ignore individual image failures
+          }
+        }),
+      )
+
+      // First render warms up image embedding; the second render is reliable.
+      // This is a known workaround for html-to-image dropping images on first call.
+      await toPng(cardRef.current, { pixelRatio: 3, cacheBust: true })
       const dataUrl = await toPng(cardRef.current, { pixelRatio: 3, cacheBust: true })
+
       const link = document.createElement("a")
       link.download = `EstrellaID-${cedula.id}.png`
       link.href = dataUrl
@@ -195,7 +220,6 @@ export function CedulaGenerator() {
                   src={cedula.foto || "/placeholder.svg"}
                   alt={`Fotografía de ${cedula.nombre}`}
                   className="h-28 w-24 rounded-md object-cover ring-1 ring-white/10"
-                  crossOrigin="anonymous"
                 />
                 <div className="flex flex-1 flex-col justify-between py-1">
                   <div>
