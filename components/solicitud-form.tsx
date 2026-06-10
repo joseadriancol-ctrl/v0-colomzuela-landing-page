@@ -13,7 +13,15 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { toast } from "sonner"
-import { Loader2 } from "lucide-react"
+import { Loader2, Star, CheckCircle2 } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog"
+import { EstrellaCard } from "@/components/estrella-card"
 
 const PAISES = [
   "Colombia",
@@ -45,6 +53,13 @@ export function SolicitudForm({ onSuccess }: { onSuccess?: () => void }) {
   const [email, setEmail] = useState("")
   const [pais, setPais] = useState("")
   const [submitting, setSubmitting] = useState(false)
+  const [success, setSuccess] = useState<{
+    nombre: string
+    email: string
+    pais: string
+    numero: number
+  } | null>(null)
+  const [showCard, setShowCard] = useState(false)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -66,13 +81,59 @@ export function SolicitudForm({ onSuccess }: { onSuccess?: () => void }) {
 
       toast.success("Solicitud recibida. Bienvenido a la espera presidencial 🇨🇴")
 
-      setNombre("")
-      setEmail("")
-      setPais("")
-      onSuccess?.()
+      setSuccess({
+        nombre: nueva.nombre,
+        email: nueva.email,
+        pais: nueva.pais,
+        numero: lista.length,
+      })
     } finally {
       setSubmitting(false)
     }
+  }
+
+  if (success) {
+    return (
+      <>
+        <div className="flex flex-col items-center gap-4 py-2 text-center">
+          <CheckCircle2 className="h-12 w-12 text-[#009639]" />
+          <div>
+            <p className="text-lg font-semibold text-foreground">Solicitud recibida</p>
+            <p className="mt-1 text-sm text-muted-foreground text-pretty">
+              Eres el ciudadano #{String(success.numero).padStart(3, "0")} en la espera presidencial.
+            </p>
+          </div>
+          <Button
+            className="w-full font-bold text-[#1a1205] hover:opacity-90"
+            style={{ backgroundColor: "#D4AF37" }}
+            onClick={() => setShowCard(true)}
+          >
+            <Star className="h-4 w-4" fill="currentColor" />
+            Generar mi EstrellaID Digital
+          </Button>
+        </div>
+
+        <Dialog open={showCard} onOpenChange={setShowCard}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-xl">
+                <Star className="h-5 w-5 text-[#FFCD00]" fill="#FFCD00" />
+                Tu EstrellaID Digital
+              </DialogTitle>
+              <DialogDescription>
+                Sube tu foto (opcional) y descarga tu cédula digital en PNG.
+              </DialogDescription>
+            </DialogHeader>
+            <EstrellaCard
+              nombre={success.nombre}
+              email={success.email}
+              pais={success.pais}
+              numero={success.numero}
+            />
+          </DialogContent>
+        </Dialog>
+      </>
+    )
   }
 
   return (
