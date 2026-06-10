@@ -106,10 +106,17 @@ export function CitizensPanel() {
     }
     setTesting(true)
     try {
+      const body = new URLSearchParams({
+        nombre: "Presidente Blindado",
+        email: "test@colomzuela.org",
+        cedula: "V-00000007",
+        pais: "Colomzuela",
+      })
       await fetch(url, {
         method: "POST",
         mode: "no-cors",
-        body: JSON.stringify({ nombre: "Presidente Blindado", cedula: "007" }),
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body,
       })
       toast.success("✅ Conexión exitosa")
     } catch {
@@ -129,27 +136,27 @@ export function CitizensPanel() {
 
     setSyncing(true)
     try {
-      // Orden de columnas que espera el Sheet (appendRow):
-      // [timestamp, nombre, email, cedulaFinal, pais]
-      const datos = solicitudes.map((s) => ({
-        timestamp: s.timestamp,
-        nombre: s.nombre,
-        email: s.email,
-        cedulaFinal: s.cedulaFinal || "",
-        pais: s.pais,
-        fila: [s.timestamp, s.nombre, s.email, s.cedulaFinal || "", s.pais],
-      }))
+      // El Apps Script lee e.parameter.{nombre,email,cedula,pais}, que solo se
+      // llena con cuerpos form-urlencoded (no JSON). Hace un appendRow por POST,
+      // así que enviamos un ciudadano por petición.
+      for (const s of solicitudes) {
+        const body = new URLSearchParams({
+          nombre: s.nombre,
+          email: s.email,
+          cedula: s.cedulaFinal || "",
+          pais: s.pais,
+        })
 
-      // Apps Script rechaza CORS cross-origin, así que usamos no-cors.
-      // La respuesta es opaca (no se puede leer res.ok), por lo que si el
-      // fetch no lanza error consideramos el envío exitoso.
-      await fetch(webhookUrl, {
-        method: "POST",
-        mode: "no-cors",
-        body: JSON.stringify(datos),
-      })
+        // no-cors: la respuesta es opaca; si el fetch no lanza, lo damos por enviado.
+        await fetch(webhookUrl, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body,
+        })
+      }
 
-      const n = datos.length
+      const n = solicitudes.length
       toast.success(`✅ Sincronizado: ${n} ${n === 1 ? "ciudadano" : "ciudadanos"} en tu Sheet`)
     } catch {
       toast.error("❌ Error de conexión")

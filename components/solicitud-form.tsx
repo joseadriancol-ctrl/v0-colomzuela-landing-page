@@ -195,6 +195,16 @@ export function SolicitudForm({ onSuccess }: { onSuccess?: () => void }) {
       </div>
 
       <div className="flex flex-col gap-2">
+        <Label htmlFor="cedula">Cédula o Pasaporte - Opcional</Label>
+        <Input
+          id="cedula"
+          value={cedula}
+          onChange={(e) => setCedula(e.target.value)}
+          placeholder="V-12345678 o déjalo vacío para EstrellaID automática"
+        />
+      </div>
+
+      <div className="flex flex-col gap-2">
         <Label htmlFor="pais">País de origen</Label>
         <Select value={pais} onValueChange={(value) => setPais(value as string)}>
           <SelectTrigger id="pais" className="w-full">
@@ -208,16 +218,6 @@ export function SolicitudForm({ onSuccess }: { onSuccess?: () => void }) {
             ))}
           </SelectContent>
         </Select>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="cedula">Cédula o Pasaporte - Opcional</Label>
-        <Input
-          id="cedula"
-          value={cedula}
-          onChange={(e) => setCedula(e.target.value)}
-          placeholder="V-12345678 o déjalo vacío para EstrellaID automática"
-        />
       </div>
 
       <Button
