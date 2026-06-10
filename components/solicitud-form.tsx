@@ -48,16 +48,33 @@ const PAISES = [
 
 const STORAGE_KEY = "solicitudes_estrellaid"
 
+/** Valida cédula venezolana (V-########) o pasaporte (P-######). */
+function validarDocumento(value: string): boolean {
+  return /^V-\d{8}$/.test(value) || /^P-\d{6}$/.test(value)
+}
+
+/** Genera el siguiente ID COL-XXXX buscando el último COL- registrado. */
+function generarColId(lista: { cedulaFinal?: string }[]): string {
+  let max = 0
+  for (const s of lista) {
+    const m = (s.cedulaFinal || "").match(/^COL-(\d+)$/)
+    if (m) max = Math.max(max, Number.parseInt(m[1], 10))
+  }
+  return `COL-${String(max + 1).padStart(4, "0")}`
+}
+
 export function SolicitudForm({ onSuccess }: { onSuccess?: () => void }) {
   const [nombre, setNombre] = useState("")
   const [email, setEmail] = useState("")
   const [pais, setPais] = useState("")
+  const [cedula, setCedula] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState<{
     nombre: string
     email: string
     pais: string
     numero: number
+    estrellaId: string
   } | null>(null)
   const [showCard, setShowCard] = useState(false)
 
@@ -65,27 +82,39 @@ export function SolicitudForm({ onSuccess }: { onSuccess?: () => void }) {
     e.preventDefault()
     if (!nombre.trim() || !email.trim() || !pais) return
 
+    const doc = cedula.trim().toUpperCase()
+    if (doc && !validarDocumento(doc)) {
+      toast.error("Formato inválido. Usa V-######## o P-###### (o déjalo vacío).")
+      return
+    }
+
     setSubmitting(true)
     try {
+      const existentes = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]")
+      const lista = Array.isArray(existentes) ? existentes : []
+
+      // Documento del usuario, o EstrellaID automático COL-XXXX.
+      const cedulaFinal = doc || generarColId(lista)
+
       const nueva = {
         nombre: nombre.trim(),
         email: email.trim(),
         pais,
+        cedulaFinal,
         timestamp: new Date().toISOString(),
       }
 
-      const existentes = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]")
-      const lista = Array.isArray(existentes) ? existentes : []
       lista.push(nueva)
       localStorage.setItem(STORAGE_KEY, JSON.stringify(lista))
 
-      toast.success("Solicitud recibida. Bienvenido a la espera presidencial 🇨🇴")
+      toast.success(`Solicitud recibida. Tu EstrellaID: ${cedulaFinal} 🇨🇴`)
 
       setSuccess({
         nombre: nueva.nombre,
         email: nueva.email,
         pais: nueva.pais,
         numero: lista.length,
+        estrellaId: cedulaFinal,
       })
     } finally {
       setSubmitting(false)
@@ -102,6 +131,10 @@ export function SolicitudForm({ onSuccess }: { onSuccess?: () => void }) {
             <p className="mt-1 text-sm text-muted-foreground text-pretty">
               Eres el ciudadano #{String(success.numero).padStart(3, "0")} en la espera presidencial.
             </p>
+          </div>
+          <div className="w-full rounded-lg border border-[#D4AF37]/40 bg-[#D4AF37]/10 px-4 py-3">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Tu EstrellaID</p>
+            <p className="font-mono text-2xl font-black text-foreground">{success.estrellaId}</p>
           </div>
           <Button
             className="w-full font-bold text-[#1a1205] hover:opacity-90"
@@ -175,6 +208,16 @@ export function SolicitudForm({ onSuccess }: { onSuccess?: () => void }) {
             ))}
           </SelectContent>
         </Select>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="cedula">Cédula o Pasaporte - Opcional</Label>
+        <Input
+          id="cedula"
+          value={cedula}
+          onChange={(e) => setCedula(e.target.value)}
+          placeholder="V-12345678 o déjalo vacío para EstrellaID automática"
+        />
       </div>
 
       <Button

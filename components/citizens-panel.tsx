@@ -38,6 +38,7 @@ type Solicitud = {
   nombre: string
   email: string
   pais: string
+  cedulaFinal?: string
   timestamp: string
 }
 
@@ -128,11 +129,15 @@ export function CitizensPanel() {
 
     setSyncing(true)
     try {
+      // Orden de columnas que espera el Sheet (appendRow):
+      // [timestamp, nombre, email, cedulaFinal, pais]
       const datos = solicitudes.map((s) => ({
+        timestamp: s.timestamp,
         nombre: s.nombre,
         email: s.email,
+        cedulaFinal: s.cedulaFinal || "",
         pais: s.pais,
-        fecha: formatFecha(s.timestamp),
+        fila: [s.timestamp, s.nombre, s.email, s.cedulaFinal || "", s.pais],
       }))
 
       // Apps Script rechaza CORS cross-origin, así que usamos no-cors.
@@ -157,9 +162,11 @@ export function CitizensPanel() {
     if (solicitudes.length === 0) return
 
     const escape = (val: string) => `"${String(val).replace(/"/g, '""')}"`
-    const header = ["#", "Nombre", "Email", "País", "Fecha"]
+    const header = ["#", "Nombre", "Email", "EstrellaID", "País", "Fecha"]
     const rows = solicitudes.map((s, i) =>
-      [i + 1, s.nombre, s.email, s.pais, formatFecha(s.timestamp)].map((v) => escape(String(v))).join(","),
+      [i + 1, s.nombre, s.email, s.cedulaFinal || "", s.pais, formatFecha(s.timestamp)]
+        .map((v) => escape(String(v)))
+        .join(","),
     )
     const csv = "\uFEFF" + [header.map(escape).join(","), ...rows].join("\n")
 
@@ -266,6 +273,7 @@ export function CitizensPanel() {
                       <TableHead className="w-12">#</TableHead>
                       <TableHead>Nombre</TableHead>
                       <TableHead>Email</TableHead>
+                      <TableHead>EstrellaID</TableHead>
                       <TableHead>País</TableHead>
                       <TableHead>Fecha</TableHead>
                     </TableRow>
@@ -276,6 +284,7 @@ export function CitizensPanel() {
                         <TableCell className="font-medium text-muted-foreground">{i + 1}</TableCell>
                         <TableCell className="font-medium">{s.nombre}</TableCell>
                         <TableCell className="text-muted-foreground">{s.email}</TableCell>
+                        <TableCell className="font-mono text-xs">{s.cedulaFinal || "—"}</TableCell>
                         <TableCell>{s.pais}</TableCell>
                         <TableCell className="text-muted-foreground">{formatFecha(s.timestamp)}</TableCell>
                       </TableRow>
