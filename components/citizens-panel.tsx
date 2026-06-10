@@ -71,9 +71,12 @@ export function CitizensPanel() {
   }, [open, cargar])
 
   const guardarWebhook = useCallback((value: string) => {
-    setWebhook(value)
+    // Guarda solo la URL pura: quita comillas, espacios y cualquier envoltura tipo fetch("...")
+    const match = value.match(/https:\/\/script\.google\.com\/macros\/s\/[^\s"')]+/)
+    const limpia = match ? match[0] : value.replace(/^['"]+|['"]+$/g, "").trim()
+    setWebhook(limpia)
     try {
-      localStorage.setItem(WEBHOOK_KEY, value)
+      localStorage.setItem(WEBHOOK_KEY, limpia)
     } catch {
       // ignore storage errors
     }
@@ -89,24 +92,23 @@ export function CitizensPanel() {
 
     setSyncing(true)
     try {
-      const payload = solicitudes.map((s) => ({
+      const datos = solicitudes.map((s) => ({
         nombre: s.nombre,
         email: s.email,
         pais: s.pais,
         fecha: formatFecha(s.timestamp),
       }))
 
-      const res = await fetch(url, {
+      // Apps Script rechaza CORS cross-origin, así que usamos no-cors.
+      // La respuesta es opaca (no se puede leer res.ok), por lo que si el
+      // fetch no lanza error consideramos el envío exitoso.
+      await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        mode: "no-cors",
+        body: JSON.stringify(datos),
       })
 
-      if (res.ok) {
-        toast.success(`✅ Sincronizado: ${payload.length} ciudadanos en tu Sheet`)
-      } else {
-        toast.error("❌ Error. Revisa URL del webhook")
-      }
+      toast.success(`✅ Sincronizado: ${datos.length} ciudadanos en tu Sheet`)
     } catch {
       toast.error("❌ Error. Revisa URL del webhook")
     } finally {
