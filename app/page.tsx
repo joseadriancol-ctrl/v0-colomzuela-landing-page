@@ -1,14 +1,14 @@
 import { HeroSection } from "@/components/hero-section"
 import { PrincipiosSection } from "@/components/principios-section"
-import { EstrellaSection } from "@/components/estrella-section"
 import { Footer } from "@/components/footer"
+import { CitizensPanel } from "@/components/citizens-panel"
 
 export default function Home() {
   return (
     <main className="min-h-screen">
+      <CitizensPanel />
       <HeroSection />
       <PrincipiosSection />
-      <EstrellaSection />
       <Footer />
     </main>
   )
