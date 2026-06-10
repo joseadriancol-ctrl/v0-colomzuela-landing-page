@@ -20,7 +20,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
-import { Users, Download, RefreshCw, Loader2, Settings, Save, PlugZap } from "lucide-react"
+import { Users, Download, Loader2, Settings, Save, PlugZap } from "lucide-react"
 
 const STORAGE_KEY = "solicitudes_estrellaid"
 const WEBHOOK_KEY = "webhook_url"
@@ -59,7 +59,6 @@ export function CitizensPanel() {
   const [configOpen, setConfigOpen] = useState(false)
   const [solicitudes, setSolicitudes] = useState<Solicitud[]>([])
   const [draftWebhook, setDraftWebhook] = useState("")
-  const [syncing, setSyncing] = useState(false)
   const [testing, setTesting] = useState(false)
 
   const cargar = useCallback(() => {
@@ -125,45 +124,6 @@ export function CitizensPanel() {
       setTesting(false)
     }
   }, [draftWebhook])
-
-  const sincronizar = useCallback(async () => {
-    const webhookUrl = localStorage.getItem(WEBHOOK_KEY) || "[PEGA_AQUI_TU_URL]"
-    if (!webhookUrl || webhookUrl === "[PEGA_AQUI_TU_URL]") {
-      toast.error("Primero pega tu URL de Google Sheets en Configuración")
-      return
-    }
-    if (solicitudes.length === 0) return
-
-    setSyncing(true)
-    try {
-      // El Apps Script lee e.parameter.{nombre,email,cedula,pais}, que solo se
-      // llena con cuerpos form-urlencoded (no JSON). Hace un appendRow por POST,
-      // así que enviamos un ciudadano por petición.
-      for (const s of solicitudes) {
-        const body = new URLSearchParams({
-          nombre: s.nombre,
-          email: s.email,
-          cedula: s.cedulaFinal || "",
-          pais: s.pais,
-        })
-
-        // no-cors: la respuesta es opaca; si el fetch no lanza, lo damos por enviado.
-        await fetch(webhookUrl, {
-          method: "POST",
-          mode: "no-cors",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body,
-        })
-      }
-
-      const n = solicitudes.length
-      toast.success(`✅ Sincronizado: ${n} ${n === 1 ? "ciudadano" : "ciudadanos"} en tu Sheet`)
-    } catch {
-      toast.error("❌ Error de conexión")
-    } finally {
-      setSyncing(false)
-    }
-  }, [solicitudes])
 
   const exportarCSV = useCallback(() => {
     if (solicitudes.length === 0) return
@@ -301,18 +261,6 @@ export function CitizensPanel() {
               </div>
 
               <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-                <Button
-                  onClick={sincronizar}
-                  disabled={syncing}
-                  className="gap-2 bg-[#0F9D58] text-white hover:bg-[#0c8348]"
-                >
-                  {syncing ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <RefreshCw className="h-4 w-4" />
-                  )}
-                  Sincronizar con Google Sheets
-                </Button>
                 <Button
                   onClick={() => {
                     setOpen(false)

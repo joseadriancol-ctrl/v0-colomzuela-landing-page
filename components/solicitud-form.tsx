@@ -46,24 +46,12 @@ const PAISES = [
   "Nicaragua",
 ]
 
-const STORAGE_KEY = "solicitudes_estrellaid"
-const WEBHOOK_KEY = "webhook_url"
 const WEBHOOK_URL =
   "https://script.google.com/macros/s/AKfycbyzt_EPAxf9saefRXrovoVgk-pLACtGPsynF2heQSk5v4I8U6z6tV5BvYfQANYbcvTn/exec"
 
-/** Valida cédula (V-#####...) o pasaporte (P-#####...). Acepta longitudes variables. */
-function validarDocumento(value: string): boolean {
-  return /^[VP]-\d{1,}$/.test(value)
-}
-
-/** Genera el siguiente ID COL-XXXX buscando el último COL- registrado. */
-function generarColId(lista: { cedulaFinal?: string }[]): string {
-  let max = 0
-  for (const s of lista) {
-    const m = (s.cedulaFinal || "").match(/^COL-(\d+)$/)
-    if (m) max = Math.max(max, Number.parseInt(m[1], 10))
-  }
-  return `COL-${String(max + 1).padStart(4, "0")}`
+/** Genera un EstrellaID automático COL-XXXX (cuando el ciudadano no da documento). */
+function generarColId(): string {
+  return `COL-${String(Math.floor(1000 + Math.random() * 9000))}`
 }
 
 export function SolicitudForm({ onSuccess }: { onSuccess?: () => void }) {
@@ -77,7 +65,6 @@ export function SolicitudForm({ onSuccess }: { onSuccess?: () => void }) {
     nombre: string
     email: string
     pais: string
-    numero: number
     estrellaId: string
   } | null>(null)
   const [showCard, setShowCard] = useState(false)
@@ -87,72 +74,40 @@ export function SolicitudForm({ onSuccess }: { onSuccess?: () => void }) {
     setErrorMsg("")
     if (!nombre.trim() || !email.trim() || !pais) return
 
-    const doc = cedula.trim().toUpperCase()
-    if (doc && !validarDocumento(doc)) {
-      setErrorMsg("Formato inválido. Usa V-12345678 o P-123456 (o déjalo vacío).")
-      toast.error("Formato de documento inválido.")
-      return
-    }
-
     setSubmitting(true)
     try {
-      const existentes = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]")
-      const lista = Array.isArray(existentes) ? existentes : []
+      // Documento del usuario (cualquier formato), o EstrellaID automático COL-XXXX.
+      const cedulaFinal = cedula.trim() || generarColId()
 
-      // Documento del usuario, o EstrellaID automático COL-XXXX.
-      const cedulaFinal = doc || generarColId(lista)
-
-      const nueva = {
-        nombre: nombre.trim(),
-        email: email.trim(),
-        pais,
-        cedulaFinal,
-        timestamp: new Date().toISOString(),
-      }
-
-      // Enviar al backend (Apps Script -> Google Sheet) usando los nombres de
-      // campo EXACTOS que espera e.parameter: nombre, email, cedula, pais.
-      const webhookUrl = localStorage.getItem(WEBHOOK_KEY) || WEBHOOK_URL
+      // Enviar DIRECTO al backend (Apps Script -> Google Sheet) usando los nombres
+      // de campo EXACTOS que espera e.parameter: nombre, email, cedula, pais.
       const formData = new FormData()
-      formData.append("nombre", nueva.nombre)
-      formData.append("email", nueva.email)
+      formData.append("nombre", nombre.trim())
+      formData.append("email", email.trim())
       formData.append("cedula", cedulaFinal)
-      formData.append("pais", nueva.pais)
+      formData.append("pais", pais)
 
-      console.log("[v0] Enviando a Apps Script:", {
-        url: webhookUrl,
-        nombre: nueva.nombre,
-        email: nueva.email,
-        cedula: cedulaFinal,
-        pais: nueva.pais,
-      })
+      console.log("[v0] POST a Apps Script:", Object.fromEntries(formData))
 
       // mode: 'no-cors' es obligatorio con Apps Script: la respuesta es opaca
       // (status 0, no legible), por eso un fetch que no lanza = enviado.
-      const response = await fetch(webhookUrl, {
+      await fetch(WEBHOOK_URL, {
         method: "POST",
         mode: "no-cors",
         body: formData,
       })
 
-      console.log("[v0] Respuesta Apps Script:", response)
-
-      // Solo guardamos localmente y mostramos éxito si el envío no lanzó error.
-      lista.push(nueva)
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(lista))
-
-      toast.success(`Solicitud enviada. Tu EstrellaID: ${cedulaFinal}`)
+      toast.success(`Ciudadano registrado en Colomzuela. Tu EstrellaID: ${cedulaFinal}`)
 
       setSuccess({
-        nombre: nueva.nombre,
-        email: nueva.email,
-        pais: nueva.pais,
-        numero: lista.length,
+        nombre: nombre.trim(),
+        email: email.trim(),
+        pais,
         estrellaId: cedulaFinal,
       })
     } catch (err) {
       console.log("[v0] Error al enviar a Apps Script:", err)
-      setErrorMsg("No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.")
+      setErrorMsg("Error: No se pudo conectar con el Sheet. Revisa permisos e inténtalo de nuevo.")
       toast.error("Error de conexión con el servidor.")
     } finally {
       setSubmitting(false)
@@ -165,9 +120,9 @@ export function SolicitudForm({ onSuccess }: { onSuccess?: () => void }) {
         <div className="flex flex-col items-center gap-4 py-2 text-center">
           <CheckCircle2 className="h-12 w-12 text-[#009639]" />
           <div>
-            <p className="text-lg font-semibold text-foreground">Solicitud recibida</p>
+            <p className="text-lg font-semibold text-foreground">Ciudadano registrado</p>
             <p className="mt-1 text-sm text-muted-foreground text-pretty">
-              Eres el ciudadano #{String(success.numero).padStart(3, "0")} en la espera presidencial.
+              Bienvenido a la espera presidencial de la República Digital de Colomzuela.
             </p>
           </div>
           <div className="w-full rounded-lg border border-[#D4AF37]/40 bg-[#D4AF37]/10 px-4 py-3">
@@ -199,7 +154,7 @@ export function SolicitudForm({ onSuccess }: { onSuccess?: () => void }) {
               nombre={success.nombre}
               email={success.email}
               pais={success.pais}
-              numero={success.numero}
+              estrellaId={success.estrellaId}
             />
           </DialogContent>
         </Dialog>

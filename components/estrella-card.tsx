@@ -9,7 +9,7 @@ interface EstrellaCardProps {
   nombre: string
   email: string
   pais: string
-  numero: number
+  estrellaId: string
 }
 
 const W = 800
@@ -50,12 +50,12 @@ function getIniciales(nombre: string): string {
   return (partes[0][0] + partes[partes.length - 1][0]).toUpperCase()
 }
 
-export function EstrellaCard({ nombre, email, pais, numero }: EstrellaCardProps) {
+export function EstrellaCard({ nombre, email, pais, estrellaId }: EstrellaCardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [foto, setFoto] = useState<string | null>(null)
   const [rendering, setRendering] = useState(false)
 
-  const numeroFmt = String(numero).padStart(3, "0")
+  const numeroFmt = estrellaId
 
   const renderCard = useCallback(async () => {
     const canvas = canvasRef.current
@@ -165,7 +165,7 @@ export function EstrellaCard({ nombre, email, pais, numero }: EstrellaCardProps)
       ctx.fillStyle = "#FFCD00"
       ctx.font = "800 26px Inter, sans-serif"
       ctx.textAlign = "right"
-      ctx.fillText(`Ciudadano #${numeroFmt}`, W - 48, H - 40)
+      ctx.fillText(`EstrellaID: ${numeroFmt}`, W - 48, H - 40)
       ctx.textAlign = "left"
     } finally {
       setRendering(false)
