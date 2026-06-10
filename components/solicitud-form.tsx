@@ -47,10 +47,13 @@ const PAISES = [
 ]
 
 const STORAGE_KEY = "solicitudes_estrellaid"
+const WEBHOOK_KEY = "webhook_url"
+const WEBHOOK_URL =
+  "https://script.google.com/macros/s/AKfycbyzt_EPAxf9saefRXrovoVgk-pLACtGPsynF2heQSk5v4I8U6z6tV5BvYfQANYbcvTn/exec"
 
-/** Valida cédula venezolana (V-########) o pasaporte (P-######). */
+/** Valida cédula (V-#####...) o pasaporte (P-#####...). Acepta longitudes variables. */
 function validarDocumento(value: string): boolean {
-  return /^V-\d{8}$/.test(value) || /^P-\d{6}$/.test(value)
+  return /^[VP]-\d{1,}$/.test(value)
 }
 
 /** Genera el siguiente ID COL-XXXX buscando el último COL- registrado. */
@@ -69,6 +72,7 @@ export function SolicitudForm({ onSuccess }: { onSuccess?: () => void }) {
   const [pais, setPais] = useState("")
   const [cedula, setCedula] = useState("")
   const [submitting, setSubmitting] = useState(false)
+  const [errorMsg, setErrorMsg] = useState("")
   const [success, setSuccess] = useState<{
     nombre: string
     email: string
@@ -78,13 +82,15 @@ export function SolicitudForm({ onSuccess }: { onSuccess?: () => void }) {
   } | null>(null)
   const [showCard, setShowCard] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setErrorMsg("")
     if (!nombre.trim() || !email.trim() || !pais) return
 
     const doc = cedula.trim().toUpperCase()
     if (doc && !validarDocumento(doc)) {
-      toast.error("Formato inválido. Usa V-######## o P-###### (o déjalo vacío).")
+      setErrorMsg("Formato inválido. Usa V-12345678 o P-123456 (o déjalo vacío).")
+      toast.error("Formato de documento inválido.")
       return
     }
 
@@ -104,10 +110,38 @@ export function SolicitudForm({ onSuccess }: { onSuccess?: () => void }) {
         timestamp: new Date().toISOString(),
       }
 
+      // Enviar al backend (Apps Script -> Google Sheet) usando los nombres de
+      // campo EXACTOS que espera e.parameter: nombre, email, cedula, pais.
+      const webhookUrl = localStorage.getItem(WEBHOOK_KEY) || WEBHOOK_URL
+      const formData = new FormData()
+      formData.append("nombre", nueva.nombre)
+      formData.append("email", nueva.email)
+      formData.append("cedula", cedulaFinal)
+      formData.append("pais", nueva.pais)
+
+      console.log("[v0] Enviando a Apps Script:", {
+        url: webhookUrl,
+        nombre: nueva.nombre,
+        email: nueva.email,
+        cedula: cedulaFinal,
+        pais: nueva.pais,
+      })
+
+      // mode: 'no-cors' es obligatorio con Apps Script: la respuesta es opaca
+      // (status 0, no legible), por eso un fetch que no lanza = enviado.
+      const response = await fetch(webhookUrl, {
+        method: "POST",
+        mode: "no-cors",
+        body: formData,
+      })
+
+      console.log("[v0] Respuesta Apps Script:", response)
+
+      // Solo guardamos localmente y mostramos éxito si el envío no lanzó error.
       lista.push(nueva)
       localStorage.setItem(STORAGE_KEY, JSON.stringify(lista))
 
-      toast.success(`Solicitud recibida. Tu EstrellaID: ${cedulaFinal} 🇨🇴`)
+      toast.success(`Solicitud enviada. Tu EstrellaID: ${cedulaFinal}`)
 
       setSuccess({
         nombre: nueva.nombre,
@@ -116,6 +150,10 @@ export function SolicitudForm({ onSuccess }: { onSuccess?: () => void }) {
         numero: lista.length,
         estrellaId: cedulaFinal,
       })
+    } catch (err) {
+      console.log("[v0] Error al enviar a Apps Script:", err)
+      setErrorMsg("No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.")
+      toast.error("Error de conexión con el servidor.")
     } finally {
       setSubmitting(false)
     }
@@ -219,6 +257,12 @@ export function SolicitudForm({ onSuccess }: { onSuccess?: () => void }) {
           </SelectContent>
         </Select>
       </div>
+
+      {errorMsg && (
+        <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {errorMsg}
+        </p>
+      )}
 
       <Button
         type="submit"
