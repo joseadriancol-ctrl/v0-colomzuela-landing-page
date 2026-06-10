@@ -25,7 +25,7 @@ import { Users, Download, RefreshCw, Loader2, Settings, Save, PlugZap } from "lu
 const STORAGE_KEY = "solicitudes_estrellaid"
 const WEBHOOK_KEY = "webhook_url"
 const DEFAULT_WEBHOOK =
-  "https://script.google.com/macros/s/AKfycbxj5cbFCZ-rqIFFK5Gw-0SONSNwn6fheNWFN7jP7Rjr1o14LF5NogYtIMB4r5csOyfH/exec"
+  "https://script.google.com/macros/s/AKfycbyzt_EPAxf9saefRXrovoVgk-pLACtGPsynF2heQSk5v4I8U6z6tV5BvYfQANYbcvTn/exec"
 
 /** Extrae solo la URL pura /exec de Apps Script si el usuario pega código extra. */
 function limpiarWebhook(value: string): string {
