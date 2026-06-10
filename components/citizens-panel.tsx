@@ -17,9 +17,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Users, Download } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { toast } from "sonner"
+import { Users, Download, RefreshCw, Loader2 } from "lucide-react"
 
 const STORAGE_KEY = "solicitudes_estrellaid"
+const WEBHOOK_KEY = "colomzuela_sheets_webhook"
+const DEFAULT_WEBHOOK = "https://script.google.com/macros/s/AKfycbxColomzuelaEstrellaID2026exec/exec"
 
 type Solicitud = {
   nombre: string
@@ -43,6 +48,8 @@ function formatFecha(iso: string): string {
 export function CitizensPanel() {
   const [open, setOpen] = useState(false)
   const [solicitudes, setSolicitudes] = useState<Solicitud[]>([])
+  const [webhook, setWebhook] = useState("")
+  const [syncing, setSyncing] = useState(false)
 
   const cargar = useCallback(() => {
     try {
@@ -52,11 +59,60 @@ export function CitizensPanel() {
     } catch {
       setSolicitudes([])
     }
+    try {
+      setWebhook(localStorage.getItem(WEBHOOK_KEY) || DEFAULT_WEBHOOK)
+    } catch {
+      setWebhook(DEFAULT_WEBHOOK)
+    }
   }, [])
 
   useEffect(() => {
     if (open) cargar()
   }, [open, cargar])
+
+  const guardarWebhook = useCallback((value: string) => {
+    setWebhook(value)
+    try {
+      localStorage.setItem(WEBHOOK_KEY, value)
+    } catch {
+      // ignore storage errors
+    }
+  }, [])
+
+  const sincronizar = useCallback(async () => {
+    const url = webhook.trim()
+    if (!url) {
+      toast.error("❌ Error. Revisa URL del webhook")
+      return
+    }
+    if (solicitudes.length === 0) return
+
+    setSyncing(true)
+    try {
+      const payload = solicitudes.map((s) => ({
+        nombre: s.nombre,
+        email: s.email,
+        pais: s.pais,
+        fecha: formatFecha(s.timestamp),
+      }))
+
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+
+      if (res.ok) {
+        toast.success(`✅ Sincronizado: ${payload.length} ciudadanos en tu Sheet`)
+      } else {
+        toast.error("❌ Error. Revisa URL del webhook")
+      }
+    } catch {
+      toast.error("❌ Error. Revisa URL del webhook")
+    } finally {
+      setSyncing(false)
+    }
+  }, [webhook, solicitudes])
 
   const exportarCSV = useCallback(() => {
     if (solicitudes.length === 0) return
@@ -136,10 +192,42 @@ export function CitizensPanel() {
                 </Table>
               </div>
 
-              <Button onClick={exportarCSV} className="gap-2 self-end">
-                <Download className="h-4 w-4" />
-                Exportar CSV
-              </Button>
+              <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-4">
+                <Label htmlFor="webhook-url" className="text-sm font-medium">
+                  URL del webhook (Google Sheets)
+                </Label>
+                <Input
+                  id="webhook-url"
+                  type="url"
+                  inputMode="url"
+                  placeholder="https://script.google.com/macros/s/TU_ID/exec"
+                  value={webhook}
+                  onChange={(e) => guardarWebhook(e.target.value)}
+                  className="font-mono text-xs"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Se guarda en tu navegador. Pégala una sola vez.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                <Button
+                  onClick={sincronizar}
+                  disabled={syncing}
+                  className="gap-2 bg-[#0F9D58] text-white hover:bg-[#0c8348]"
+                >
+                  {syncing ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                  Sincronizar con Google Sheets
+                </Button>
+                <Button onClick={exportarCSV} variant="outline" className="gap-2">
+                  <Download className="h-4 w-4" />
+                  Exportar CSV
+                </Button>
+              </div>
             </>
           )}
         </DialogContent>
