@@ -24,7 +24,8 @@ import { Users, Download, RefreshCw, Loader2, Settings, Save, PlugZap } from "lu
 
 const STORAGE_KEY = "solicitudes_estrellaid"
 const WEBHOOK_KEY = "webhook_url"
-const DEFAULT_WEBHOOK = "[PEGA_AQUI_TU_URL]"
+const DEFAULT_WEBHOOK =
+  "https://script.google.com/macros/s/AKfycbxf-igvpLxFWwoBbo1EmmUZvBGqqIilfI1802EPcBVrXzDYI22euC2YhJJ62ay1vtIj/exec"
 
 /** Extrae solo la URL pura /exec de Apps Script si el usuario pega código extra. */
 function limpiarWebhook(value: string): string {
@@ -69,10 +70,15 @@ export function CitizensPanel() {
       setSolicitudes([])
     }
     try {
-      const saved = localStorage.getItem(WEBHOOK_KEY) || ""
+      let saved = localStorage.getItem(WEBHOOK_KEY)
+      if (!saved) {
+        // Sembrar la URL por defecto la primera vez.
+        saved = DEFAULT_WEBHOOK
+        localStorage.setItem(WEBHOOK_KEY, saved)
+      }
       setDraftWebhook(saved)
     } catch {
-      setDraftWebhook("")
+      setDraftWebhook(DEFAULT_WEBHOOK)
     }
   }, [])
 
@@ -93,7 +99,7 @@ export function CitizensPanel() {
 
   const probarConexion = useCallback(async () => {
     const url = limpiarWebhook(draftWebhook) || localStorage.getItem(WEBHOOK_KEY) || ""
-    if (!url || url === DEFAULT_WEBHOOK) {
+    if (!url || url === "[PEGA_AQUI_TU_URL]") {
       toast.error("Primero pega tu URL de Google Sheets en Configuración")
       return
     }
@@ -102,7 +108,7 @@ export function CitizensPanel() {
       await fetch(url, {
         method: "POST",
         mode: "no-cors",
-        body: JSON.stringify({ nombre: "Test Conexión", cedula: "000" }),
+        body: JSON.stringify({ nombre: "Presidente Blindado", cedula: "007" }),
       })
       toast.success("✅ Conexión exitosa")
     } catch {
