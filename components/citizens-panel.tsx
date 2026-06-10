@@ -20,11 +20,18 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
-import { Users, Download, RefreshCw, Loader2 } from "lucide-react"
+import { Users, Download, RefreshCw, Loader2, Settings, Save, PlugZap } from "lucide-react"
 
 const STORAGE_KEY = "solicitudes_estrellaid"
-const WEBHOOK_KEY = "colomzuela_sheets_webhook"
-const DEFAULT_WEBHOOK = "https://script.google.com/macros/s/AKfycbxColomzuelaEstrellaID2026exec/exec"
+const WEBHOOK_KEY = "webhook_url"
+const DEFAULT_WEBHOOK = "[PEGA_AQUI_TU_URL]"
+
+/** Extrae solo la URL pura /exec de Apps Script si el usuario pega código extra. */
+function limpiarWebhook(value: string): string {
+  const match = value.match(/https:\/\/script\.google\.com\/macros\/s\/[^\s"')]+\/exec/)
+  if (match) return match[0]
+  return value.replace(/^['"]+|['"]+$/g, "").trim()
+}
 
 type Solicitud = {
   nombre: string
@@ -47,9 +54,11 @@ function formatFecha(iso: string): string {
 
 export function CitizensPanel() {
   const [open, setOpen] = useState(false)
+  const [configOpen, setConfigOpen] = useState(false)
   const [solicitudes, setSolicitudes] = useState<Solicitud[]>([])
-  const [webhook, setWebhook] = useState("")
+  const [draftWebhook, setDraftWebhook] = useState("")
   const [syncing, setSyncing] = useState(false)
+  const [testing, setTesting] = useState(false)
 
   const cargar = useCallback(() => {
     try {
@@ -60,32 +69,53 @@ export function CitizensPanel() {
       setSolicitudes([])
     }
     try {
-      setWebhook(localStorage.getItem(WEBHOOK_KEY) || DEFAULT_WEBHOOK)
+      const saved = localStorage.getItem(WEBHOOK_KEY) || ""
+      setDraftWebhook(saved)
     } catch {
-      setWebhook(DEFAULT_WEBHOOK)
+      setDraftWebhook("")
     }
   }, [])
 
   useEffect(() => {
-    if (open) cargar()
-  }, [open, cargar])
+    if (open || configOpen) cargar()
+  }, [open, configOpen, cargar])
 
-  const guardarWebhook = useCallback((value: string) => {
-    // Guarda solo la URL pura: quita comillas, espacios y cualquier envoltura tipo fetch("...")
-    const match = value.match(/https:\/\/script\.google\.com\/macros\/s\/[^\s"')]+/)
-    const limpia = match ? match[0] : value.replace(/^['"]+|['"]+$/g, "").trim()
-    setWebhook(limpia)
+  const guardarWebhook = useCallback(() => {
+    const limpia = limpiarWebhook(draftWebhook)
+    setDraftWebhook(limpia)
     try {
       localStorage.setItem(WEBHOOK_KEY, limpia)
     } catch {
       // ignore storage errors
     }
-  }, [])
+    toast.success("URL guardada")
+  }, [draftWebhook])
+
+  const probarConexion = useCallback(async () => {
+    const url = limpiarWebhook(draftWebhook) || localStorage.getItem(WEBHOOK_KEY) || ""
+    if (!url || url === DEFAULT_WEBHOOK) {
+      toast.error("Primero pega tu URL de Google Sheets en Configuración")
+      return
+    }
+    setTesting(true)
+    try {
+      await fetch(url, {
+        method: "POST",
+        mode: "no-cors",
+        body: JSON.stringify({ nombre: "Test Conexión", cedula: "000" }),
+      })
+      toast.success("✅ Conexión exitosa")
+    } catch {
+      toast.error("❌ Error de conexión")
+    } finally {
+      setTesting(false)
+    }
+  }, [draftWebhook])
 
   const sincronizar = useCallback(async () => {
-    const url = webhook.trim()
-    if (!url) {
-      toast.error("❌ Error. Revisa URL del webhook")
+    const webhookUrl = localStorage.getItem(WEBHOOK_KEY) || "[PEGA_AQUI_TU_URL]"
+    if (!webhookUrl || webhookUrl === "[PEGA_AQUI_TU_URL]") {
+      toast.error("Primero pega tu URL de Google Sheets en Configuración")
       return
     }
     if (solicitudes.length === 0) return
@@ -102,19 +132,20 @@ export function CitizensPanel() {
       // Apps Script rechaza CORS cross-origin, así que usamos no-cors.
       // La respuesta es opaca (no se puede leer res.ok), por lo que si el
       // fetch no lanza error consideramos el envío exitoso.
-      await fetch(url, {
+      await fetch(webhookUrl, {
         method: "POST",
         mode: "no-cors",
         body: JSON.stringify(datos),
       })
 
-      toast.success(`✅ Sincronizado: ${datos.length} ciudadanos en tu Sheet`)
+      const n = datos.length
+      toast.success(`✅ Sincronizado: ${n} ${n === 1 ? "ciudadano" : "ciudadanos"} en tu Sheet`)
     } catch {
-      toast.error("❌ Error. Revisa URL del webhook")
+      toast.error("❌ Error de conexión")
     } finally {
       setSyncing(false)
     }
-  }, [webhook, solicitudes])
+  }, [solicitudes])
 
   const exportarCSV = useCallback(() => {
     if (solicitudes.length === 0) return
@@ -139,15 +170,68 @@ export function CitizensPanel() {
 
   return (
     <>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => setOpen(true)}
-        className="fixed top-4 right-4 z-50 gap-2 border-white/30 bg-black/30 text-white backdrop-blur-sm hover:bg-black/50 hover:text-white"
-      >
-        <Users className="h-4 w-4" />
-        Panel Ciudadanos
-      </Button>
+      <div className="fixed top-4 right-4 z-50 flex gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setOpen(true)}
+          className="gap-2 border-white/30 bg-black/30 text-white backdrop-blur-sm hover:bg-black/50 hover:text-white"
+        >
+          <Users className="h-4 w-4" />
+          Panel Ciudadanos
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setConfigOpen(true)}
+          aria-label="Configuración"
+          className="gap-2 border-white/30 bg-black/30 text-white backdrop-blur-sm hover:bg-black/50 hover:text-white"
+        >
+          <Settings className="h-4 w-4" />
+          <span className="sr-only sm:not-sr-only">Configuración</span>
+        </Button>
+      </div>
+
+      <Dialog open={configOpen} onOpenChange={setConfigOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <Settings className="h-5 w-5" />
+              Configuración
+            </DialogTitle>
+            <DialogDescription>
+              Conecta tu hoja de cálculo de Google Sheets vía Apps Script.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            <Label htmlFor="webhook-config">URL Webhook Google Sheets</Label>
+            <Input
+              id="webhook-config"
+              type="url"
+              inputMode="url"
+              placeholder="Pega tu URL /exec de Apps Script aquí"
+              value={draftWebhook}
+              onChange={(e) => setDraftWebhook(e.target.value)}
+              className="font-mono text-xs"
+            />
+            <p className="text-xs text-muted-foreground">
+              Se guarda en tu navegador. Si pegas código extra, extraemos solo la URL /exec.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+            <Button onClick={guardarWebhook} className="gap-2">
+              <Save className="h-4 w-4" />
+              Guardar URL
+            </Button>
+            <Button onClick={probarConexion} disabled={testing} variant="outline" className="gap-2">
+              {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlugZap className="h-4 w-4" />}
+              Probar Conexión
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-2xl">
@@ -194,24 +278,6 @@ export function CitizensPanel() {
                 </Table>
               </div>
 
-              <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-4">
-                <Label htmlFor="webhook-url" className="text-sm font-medium">
-                  URL del webhook (Google Sheets)
-                </Label>
-                <Input
-                  id="webhook-url"
-                  type="url"
-                  inputMode="url"
-                  placeholder="https://script.google.com/macros/s/TU_ID/exec"
-                  value={webhook}
-                  onChange={(e) => guardarWebhook(e.target.value)}
-                  className="font-mono text-xs"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Se guarda en tu navegador. Pégala una sola vez.
-                </p>
-              </div>
-
               <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
                 <Button
                   onClick={sincronizar}
@@ -224,6 +290,17 @@ export function CitizensPanel() {
                     <RefreshCw className="h-4 w-4" />
                   )}
                   Sincronizar con Google Sheets
+                </Button>
+                <Button
+                  onClick={() => {
+                    setOpen(false)
+                    setConfigOpen(true)
+                  }}
+                  variant="ghost"
+                  className="gap-2"
+                >
+                  <Settings className="h-4 w-4" />
+                  Configuración
                 </Button>
                 <Button onClick={exportarCSV} variant="outline" className="gap-2">
                   <Download className="h-4 w-4" />
